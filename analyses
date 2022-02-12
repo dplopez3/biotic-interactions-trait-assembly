@@ -62,11 +62,68 @@ Rao.SES.AK.wide.indswap <- Rao.SES.AK.indswap %>%
 Rao.Results.all <- rbind(Rao.AK.indswap[, 1:6], Rao.CA.indswap[,1:6], Rao.PA.indswap[,1:6])
 ```
 
+#LMM observed RaoQ
 
+```{r echo=FALSE}
 
+Rao.all.lmer <- lmer(Rao_obs ~ Region*Duration*Treatment + (1|Region:Site) + (1|Region:Site:Duration) + (1|Region:Site:Treatment) + (1|Region:Site:Duration:Treatment) , data = Rao.Results.all)
+res.Rao.all.lmer <- residuals(Rao.all.lmer, level = 0)
+plot(res.Rao.all.lmer)
+hist(res.Rao.all.lmer)
+qqnorm(res.Rao.all.lmer)
+shapiro.test(res.Rao.all.lmer)
+plot(Rao.all.lmer)
+summary(Rao.all.lmer)
+anova(Rao.all.lmer)
 
-#Function to test null communities as statistically different from 0 
+#Contrats region:duration
+condMeans.all.duration <- emmeans(Rao.all.lmer, ~Region*Duration)
+condMeans.all.duration <- as_tibble(condMeans.all.duration)
+condMeans.all.duration
+AK.dur.nmx <- c(-1, 0, 0, 1, 0, 0)
+CA.dur.nmx <- c(0, -1, 0, 0, 1, 0)
+PA.dur.nmx <- c(0, 0, -1, 0, 0, 1)
+duration.contrast.all.nmx <- cbind(AK.dur.nmx, CA.dur.nmx, PA.dur.nmx)
+contrasts.Rao.lmer.dur <- as_tibble(contrast(condMeans.all.duration, list(duration.contrast.all.nmx)))
+contrasts.Rao.lmer.dur
+```
+#Figure 1
+```{r}
+
+condMeans.all.duration$Duration_f <-  factor(condMeans.all.duration$Duration, levels=c('3_month','12_month'))
+condMeans.all.duration <- mutate(condMeans.all.duration, plus.SE = emmean + SE, minus.SE = emmean - SE)
+estmean.duration <- ggplot(condMeans.all.duration, aes(Duration_f, emmean, group = Region))+
+  geom_errorbar(aes(ymin= minus.SE, ymax= plus.SE), width=0.05, color="black")+
+  geom_path( linetype = 3)+
+  geom_point(aes(shape = Region, size = 1.5, color = Region))+
+  scale_fill_brewer(palette = "Set1")+
+  guides(size = FALSE, color = guide_legend(override.aes = list(size=4)))+
+  labs(y = "RaoQ", x = "Assembly time")+
+  theme_classic()+
+  theme(text = element_text(size = 14))
+```
+#SESRaoQ - Wilcoxon tests
+```{r}
+
+#Function to test SESRaoQ different from 0 
 wilcoxon <- function(x){
   wilcox.test(x, mu = 0, alternative = "two.sided")
 }
+Wlcxn.AK <- apply(Rao.SES.AK.wide.indswap[, 5:8], MARGIN = 2,  wilcoxon)
+#^^^repeat for each region^^^#
+```
+#Figure 2
+```{r}
+
+All.SES.Rao <- rbind(Rao.SES.AK.indswap, Rao.SES.CA.indswap, Rao.SES.MX.indswap, Rao.SES.PA.indswap)
+
+All.Rao.plot <-  ggplot(All.SES.Rao, aes(Treatment, SES_Rao))+
+                  geom_hline(yintercept=0, color = "gray", size = 1)+
+                  geom_boxplot(width = 0.5, outlier.size = 0.08)+
+                  ylim(-4, 3)+
+                  labs(y = "SES RaoQ")+
+                  facet_grid(Region~Duration_f)+
+                  theme(panel.grid.major = element_blank(), text = element_text(size = 14))
+```
+
 
