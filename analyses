@@ -1,0 +1,24 @@
+title: "biotic interactions shape trait assembly of marine communities across time and latitude"
+author: "D.P.L."
+
+output:
+  html_notebook:
+    collapsed: no
+    number_sections: yes
+    smooth_scroll: yes
+    toc: yes
+    toc_float: yes
+---
+
+```{r include=FALSE}
+
+library(FD)
+library(picante)
+library(tidyverse)
+library(ggplot2)
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(RColorBrewer)
+```
+
