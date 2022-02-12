@@ -20,6 +20,10 @@ library(lme4)
 library(lmerTest)
 library(emmeans)
 library(RColorBrewer)
+library(mvabund)
+library(scales)
+library(MuMIn)
+library(lmerTest)
 ```
 #observed and randomized RaoQ
 ```{r include=FALSE}
@@ -125,5 +129,31 @@ All.Rao.plot <-  ggplot(All.SES.Rao, aes(Treatment, SES_Rao))+
                   facet_grid(Region~Duration_f)+
                   theme(panel.grid.major = element_blank(), text = element_text(size = 14))
 ```
-
-
+#upload data x CWM
+```{r eval=FALSE, include=FALSE}
+AK_cover <- read.csv(file.choose())
+AK_traits <- read.csv(file.choose(), row.names = 2)
+#^^^repeat for each region^^^#
+```
+#Calculate CWMs and standardize#
+```{r eval=FALSE, include=FALSE}
+#function to standardize CWMs between 0-100#
+trait_std <- function(x) {
+  cbind(
+  x[,1:7],
+  x[,8:15]*100,
+  x[,16]/max(x[,16])*100,
+  x[,17]/max(x[,17])*100,
+  x[,18]/max(x[,18])*100,
+  x[,19:39]*100
+      )
+         } 
+#Calculate CWM each region#
+CWM.AK <- as_tibble(cbind(AK_cover[,1:5], dbFD(AK_traits[,4:17], AK_cover[,6:36], CWM.type = "all", calc.FDiv = FALSE, calc.CWM = TRUE, corr = "cailliez")$CWM))
+CWM.AK.std <- trait_std(CWM.AK)
+CWM.AK.std <- CWM.AK.std%>%
+  mutate_at(6:39, round, 0)
+#^^^repeat for each region^^^#
+```
+#CWM manyglm
+```{r eval=FALSE, include=FALSE}
