@@ -22,3 +22,47 @@ library(emmeans)
 library(RColorBrewer)
 ```
 
+```{r include=FALSE}
+###Calculate observed RaoQ and randomized RaoQ###
+#Function to randomize presence-absence matrix by keeping richness per community and ocurrence intact (row sums and column sums)
+
+Rao.null.indswap<-function(x, y){
+dbFD(x[colnames(y),], corr = "cailliez", scale.RaoQ = F, randomizeMatrix(y, null.model="independentswap"))$RaoQ
+}
+
+#Region:AK; Site:Bar Harbor#
+
+AK.BH.indswap.Rao<-cbind(AK_BH_PrsAbs[,1:5], dbFD(AK_BH_traits[, 4:17][colnames(AK_BH_PrsAbs[, 6:38]),], AK_BH_PrsAbs[,6:38], corr = "cailliez", scale.RaoQ = F)$RaoQ, replicate(999, Rao.null.indswap(AK_BH_traits[,4:17], AK_BH_PrsAbs[,6:38])))%>%
+  rename(Rao_obs = 6)
+  
+#Region:AK; Site:Knudson Cove#
+
+AK.KC.indswap.Rao<-cbind(AK_KC_PrsAbs[,1:5], dbFD(AK_KC_traits[, 4:17][colnames(AK_KC_PrsAbs[, 6:35]),], AK_KC_PrsAbs[,6:35], corr = "cailliez", scale.RaoQ = F)$RaoQ, replicate(999, Rao.null.indswap(AK_KC_traits[,4:17], AK_KC_PrsAbs[,6:35])))%>%
+  rename(Rao_obs = 6)
+
+#Region:AK; Site:Refuge Cove#
+
+AK.RC.indswap.Rao<-cbind(AK_RC_PrsAbs[,1:5], dbFD(AK_RC_traits[, 4:17][colnames(AK_RC_PrsAbs[, 6:35]),], AK_RC_PrsAbs[,6:35], corr = "cailliez", scale.RaoQ = F)$RaoQ, replicate(999, Rao.null.indswap(AK_RC_traits[,4:17], AK_RC_PrsAbs[,6:35])))%>%
+  rename(Rao_obs = 6)
+
+###Bind all/calculate SES per region###
+
+Rao.AK.indswap <- rbind(AK.BH.indswap.Rao, AK.KC.indswap.Rao, AK.RC.indswap.Rao)
+
+Rao.SES.AK.indswap <- cbind(Rao.AK.indswap[,1:6], (Rao.AK.indswap[,6] - apply(Rao.AK.indswap[, 7:1005], MARGIN = 1, mean)) / apply(Rao.AK.indswap[, 7:1005], MARGIN = 1, sd))%>%
+  rename(SES_Rao = 7)
+
+Rao.SES.AK.wide.indswap <- Rao.SES.AK.indswap %>%
+ pivot_wider(names_from = c(Duration, Treatment), values_from = SES_Rao)
+
+#^^^Repeat for each region/site^^^# 
+```
+
+
+
+
+#Function to test null communities as statistically different from 0 
+wilcoxon <- function(x){
+  wilcox.test(x, mu = 0, alternative = "two.sided")
+}
+
