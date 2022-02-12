@@ -21,7 +21,7 @@ library(lmerTest)
 library(emmeans)
 library(RColorBrewer)
 ```
-
+#observed and randomized RaoQ
 ```{r include=FALSE}
 ###Calculate observed RaoQ and randomized RaoQ###
 #Function to randomize presence-absence matrix by keeping richness per community and ocurrence intact (row sums and column sums)
@@ -56,6 +56,10 @@ Rao.SES.AK.wide.indswap <- Rao.SES.AK.indswap %>%
  pivot_wider(names_from = c(Duration, Treatment), values_from = SES_Rao)
 
 #^^^Repeat for each region/site^^^# 
+
+###Bind all observed RaoQ for mixed model###
+
+Rao.Results.all <- rbind(Rao.AK.indswap[, 1:6], Rao.CA.indswap[,1:6], Rao.PA.indswap[,1:6])
 ```
 
 
