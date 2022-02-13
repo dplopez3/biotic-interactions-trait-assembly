@@ -157,3 +157,67 @@ CWM.AK.std <- CWM.AK.std%>%
 ```
 #CWM manyglm
 ```{r eval=FALSE, include=FALSE}
+
+CWM.3.12mo <- rbind(CWM.AK.std, CWM.CA.std, CWM.PA.std)%>%
+CWM.tabu.3.12mo <- mvabund(CWM.3.12mo[,6:39])
+
+mod.pois.3.12 <- manyglm(CWM.tabu.3.12~CWM.3.12mo$Region*CWM.3.12mo$Duration*CWM.3.12mo$Treatment, family = "poisson", cor.type = "I")
+qqnorm(residuals.manyglm(mod.pois.3.12))
+qqline(residuals.manyglm(mod.pois.3.12))
+plot(mod.pois.3.12)
+
+mod.nb.3.12 <- manyglm(CWM.tabu.3.12~CWM.3.12mo$Region*CWM.3.12mo$Duration*CWM.3.12mo$Treatment, family = "negative.binomial", cor.type = "I")
+qqnorm(residuals.manyglm(mod.nb.3.12))
+qqline(residuals.manyglm(mod.nb.3.12))
+plot(mod.nb.3.12)
+AIC(mod.pois.3.12, mod.nb.3.12)
+permID.3.12 <- shuffleSet(n=nrow(CWM.tabu.3.12),control = how(block=CWM.3.12mo$Site))
+aov.mod.nb.3.12 <- anova.manyglm(mod.nb.3.12, bootID = permID.3.12, nBoot = 999, p.uni = "adjusted")
+#pairwise region:duration
+aov.mod.nb.3.12.p.regdur <- anova.manyglm(mod.nb.3.12, pairwise.comp = ~CWM.3.12mo$Region*CWM.3.12mo$Duration, bootID = permID.3.12, nBoot = 999, p.uni = "adjusted")
+#pairwise region:duration:treatment
+aov.mod.nb.3.12.p.rdt <- anova.manyglm(mod.nb.3.12, pairwise.comp = ~CWM.3.12mo$Region*CWM.3.12mo$Duration*CWM.3.12mo$Treatment, bootID = permID.3.12, nBoot = 999, p.uni = "adjusted")
+```
+#Figure 3
+```{r}
+#Calculate summary stats x each trait with significant region:duration
+
+trait.x.m.sd <- summarySE(CWM.3.12mo, measurevar="trait.x", groupvars=c("Region","Duration"))%>%
+    add_column(Trait = "trait.x")%>%
+   dplyr::rename( mean = 4)
+
+CWM.graph1.dt <- rbind(trait.x.m.sd, trait.y.m.sd, trait.z.m.sd)
+pd <- position_dodge2(width = 5)
+
+CWM.graph1 <- ggplot(CWM.graph1.dt, aes(Trait, mean))+
+  geom_point(aes(shape = Duration, color = Trait), size = 2, position = position_dodge(width = 1))+
+  scale_shape_manual(values=c(1, 2))+
+  geom_errorbar(aes(ymin= (mean - se), ymax= (mean + se)), width = 0.2, position = pd)+
+  labs(y = "CWM")+
+  theme(panel.grid.major = element_blank(), text = element_text(size = 14))+
+facet_grid(Region~.)
+```
+#Figure 4a,b,c
+```{r}
+CWM.3.12mo$Duration <-  factor(CWM.3.12mo$Duration, levels=c('3_month','12_month'))
+
+lecit.plot <- ggplot(CWM.3.12mo[-61:-120,], aes(Treatment, Lar_dev_leci))+
+                  geom_boxplot(width = 0.5, outlier.size = 1)+
+                  ylim(0, 100)+
+                  labs(y = "CWM lecitotrophic", x = "predation treatment")+
+                  facet_wrap(Region~Duration)+
+                  theme(panel.grid.major = element_blank(), text = element_text(size = 14))
+                  
+calcified.plot <- ggplot(CWM.3.12mo[-61:-120,], aes(Treatment, Struc_defe_CalcStr))+
+                  geom_boxplot(width = 0.5, outlier.size = 1)+
+                  ylim(0, 100)+
+                  labs(y = "CWM calcified", x = "predation treatment")+
+                  facet_wrap(Region~Duration)+
+                  theme(panel.grid.major = element_blank(), text = element_text(size = 14))
+                  
+water.plot <- ggplot(CWM.3.12mo[-61:-120,], aes(Treatment, Wat_cont))+
+                  geom_boxplot(width = 0.5, outlier.size = 1)+
+                  ylim(0,100)+
+                  labs(y = "CWM water content", x = "predation treatment")+
+                  facet_wrap(Region~Duration)+
+                  theme(panel.grid.major = element_blank(), text = element_text(size = 14))
