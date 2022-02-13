@@ -221,3 +221,4 @@ water.plot <- ggplot(CWM.3.12mo[-61:-120,], aes(Treatment, Wat_cont))+
                   labs(y = "CWM water content", x = "predation treatment")+
                   facet_wrap(Region~Duration)+
                   theme(panel.grid.major = element_blank(), text = element_text(size = 14))
+```
