@@ -25,6 +25,18 @@ library(scales)
 library(MuMIn)
 library(lmerTest)
 ```
+#upload data
+
+```{r eval=FALSE, include=FALSE}
+#Upload data by site#
+
+region_site_PrsAbs <- read.csv(file.choose())
+region_site_traits <- read.csv(file.choose(), row.names = 2)
+
+#check column rows are identical#
+identical(row.names(region_site_traits), row.names(t(region_site_PrsAbs[,:])))
+```
+
 #observed and randomized RaoQ
 ```{r include=FALSE}
 ###Calculate observed RaoQ and randomized RaoQ###
