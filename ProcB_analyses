@@ -1,0 +1,581 @@
+title: "Biotic interactions shape trait assembly across time and latitude"
+author: "D.P.L."
+
+library(FD)
+library(picante)
+library(tidyverse)
+library(ggplot2)
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(RColorBrewer)
+library(MuMIn)
+library(glmmTMB)
+library(DHARMa)
+library(car)
+library(mvabund)
+library(FactoMineR)
+
+
+#"Functional trait diversity: RaoQ Null constrained (Local by Site) & Observed Rao mixed model"
+
+##Load files (3 & 12 mo)
+
+#ALASKA#
+
+AK_BH_PrsAbs <- read.csv(file.choose())
+AK_BH_traits <- read.csv(file.choose(), row.names = 3)
+
+AK_RC_PrsAbs <- read.csv(file.choose())
+AK_RC_traits <- read.csv(file.choose(), row.names = 3)
+
+AK_KC_PrsAbs <- read.csv(file.choose())
+AK_KC_traits <- read.csv(file.choose(), row.names = 3)
+
+#CALIFORNIA#
+
+CA_LL_PrsAbs <- read.csv(file.choose())
+CA_LL_traits <- read.csv(file.choose(), row.names = 3)
+
+CA_RM_PrsAbs <- read.csv(file.choose())
+CA_RM_traits <- read.csv(file.choose(), row.names = 3)
+
+CA_SFM_PrsAbs <- read.csv(file.choose())
+CA_SFM_traits <- read.csv(file.choose(), row.names = 3)
+
+#PANAMA#
+PA_LP_PrsAbs <- read.csv(file.choose())
+PA_LP_traits <- read.csv(file.choose(), row.names = 3)
+
+PA_NI_PrsAbs <- read.csv(file.choose())
+PA_NI_traits <- read.csv(file.choose(), row.names = 3)
+
+PA_FM_PrsAbs <- read.csv(file.choose())
+PA_FM_traits <- read.csv(file.choose(), row.names = 3)
+
+#MEXICO#
+MX_MLP_PrsAbs_SS <- read.csv(file.choose())
+MX_MLP_traits_SS<- read.csv(file.choose(), row.names = 3)
+
+MX_MCB_PrsAbs_SS <- read.csv(file.choose())
+MX_MCB_traits_SS<- read.csv(file.choose(), row.names = 3)
+
+MX_MP_PrsAbs_SS <- read.csv(file.choose())
+MX_MP_traits_SS<- read.csv(file.choose(), row.names = 3)
+
+#MEXICO 3 mo only#
+
+MX_MLP_PrsAbs_SS_3mo <- read.csv(file.choose())
+MX_MLP_traits_SS_3mo <- read.csv(file.choose(), row.names = 3)
+
+
+MX_MCB_PrsAbs_SS_3mo <- read.csv(file.choose())
+MX_MCB_traits_SS_3mo <- read.csv(file.choose(), row.names = 3)
+
+MX_MP_PrsAbs_SS_3mo <- read.csv(file.choose())
+MX_MP_traits_SS_3mo <- read.csv(file.choose(), row.names = 3)
+
+
+#check column/rows are identical
+##ALL##
+identical(row.names(AK_BH_traits), row.names(t(AK_BH_PrsAbs[, 6:40])))
+identical(row.names(AK_RC_traits), row.names(t(AK_RC_PrsAbs[, 6:37])))
+identical(row.names(AK_KC_traits), row.names(t(AK_KC_PrsAbs[, 6:38])))
+
+identical(row.names(CA_LL_traits), row.names(t(CA_LL_PrsAbs[, 6:27])))
+identical(row.names(CA_RM_traits), row.names(t(CA_RM_PrsAbs[, 6:42])))
+identical(row.names(CA_SFM_traits), row.names(t(CA_SFM_PrsAbs[, 6:44])))
+
+identical(row.names(PA_LP_traits), row.names(t(PA_LP_PrsAbs[, 6:40])))
+identical(row.names(PA_NI_traits), row.names(t(PA_NI_PrsAbs[, 6:47])))
+identical(row.names(PA_FM_traits), row.names(t(PA_FM_PrsAbs[, 6:42])))
+
+identical(row.names(MX_MLP_traits_SS), row.names(t(MX_MLP_PrsAbs_SS[, 6:52])))
+identical(row.names(MX_MP_traits_SS), row.names(t(MX_MP_PrsAbs_SS[, 6:48])))
+identical(row.names(MX_MCB_traits_SS), row.names(t(MX_MCB_PrsAbs_SS[, 6:50])))
+
+identical(row.names(MX_MLP_traits_SS_3mo), row.names(t(MX_MLP_PrsAbs_SS_3mo[, 6:46])))
+identical(row.names(MX_MP_traits_SS_3mo), row.names(t(MX_MP_PrsAbs_SS_3mo[, 6:47])))
+identical(row.names(MX_MCB_traits_SS_3mo), row.names(t(MX_MCB_PrsAbs_SS_3mo[, 6:49])))
+
+##Functions
+#Function to randomize presence-absence matrix by keeping richness per community and ocurrence intact (row sums and column sums)
+Rao.null.indswap<-function(x, y){
+  dbFD(x[colnames(y),], corr = "cailliez", scale.RaoQ = F, randomizeMatrix(y, null.model="independentswap"))$RaoQ
+}
+
+##Code source https://daijiang.name/en/2014/05/29/null-model-for-phylogenetic-functional-diversity/##
+
+#Function to test null communities as statistically different from 0 
+wilcoxon <- function(x){
+  wilcox.test(x, mu = 0, alternative = "two.sided")
+}
+
+###AK Bar Harbor RaoQ IndSwap
+AK.BH.indswap.Rao<-cbind(AK_BH_PrsAbs[,1:5], dbFD(AK_BH_traits[, 5:18][colnames(AK_BH_PrsAbs[, 6:40]),], AK_BH_PrsAbs[,6:40], corr = "cailliez", scale.RaoQ = F)$RaoQ, replicate(999, Rao.null.indswap(AK_BH_traits[,5:18], AK_BH_PrsAbs[,6:40])))%>%
+  rename(Rao_obs = 6)
+
+
+###AK Knudson Cove RaoQ IndSwap
+AK.KC.indswap.Rao<-cbind(AK_KC_PrsAbs[,1:5], dbFD(AK_KC_traits[, 5:18][colnames(AK_KC_PrsAbs[, 6:38]),], AK_KC_PrsAbs[,6:38], corr = "cailliez", scale.RaoQ = F)$RaoQ, replicate(999, Rao.null.indswap(AK_KC_traits[,5:18], AK_KC_PrsAbs[,6:38])))%>%
+  rename(Rao_obs = 6)
+
+
+###AK Refuge Cove RaoQ IndSwap
+AK.RC.indswap.Rao<-cbind(AK_RC_PrsAbs[,1:5], dbFD(AK_RC_traits[, 5:18][colnames(AK_RC_PrsAbs[, 6:37]),], AK_RC_PrsAbs[,6:37], corr = "cailliez", scale.RaoQ = F)$RaoQ, replicate(999, Rao.null.indswap(AK_RC_traits[,5:18], AK_RC_PrsAbs[,6:37])))%>%
+  rename(Rao_obs = 6)
+
+#CA Loch Lomond RaoQ IndSwap
+CA.LL.indswap.Rao<-cbind(CA_LL_PrsAbs[,1:5], dbFD(CA_LL_traits[, 5:18][colnames(CA_LL_PrsAbs[, 6:27]),], CA_LL_PrsAbs[,6:27], corr = "cailliez", scale.RaoQ = F)$RaoQ, replicate(999, Rao.null.indswap(CA_LL_traits[,5:18], CA_LL_PrsAbs[,6:27])))%>%
+  rename(Rao_obs = 6)
+
+#CA Richmond RaoQ IndSwap
+CA.RM.indswap.Rao<-cbind(CA_RM_PrsAbs[,1:5], dbFD(CA_RM_traits[, 5:18][colnames(CA_RM_PrsAbs[, 6:42]),], CA_RM_PrsAbs[,6:42], corr = "cailliez", scale.RaoQ = F)$RaoQ, replicate(999, Rao.null.indswap(CA_RM_traits[,5:18], CA_RM_PrsAbs[,6:42])))%>%
+  rename(Rao_obs = 6)
+
+#CA SFM RaoQ IndSwap
+CA.SFM.indswap.Rao<-cbind(CA_SFM_PrsAbs[,1:5], dbFD(CA_SFM_traits[, 5:18][colnames(CA_SFM_PrsAbs[, 6:44]),], CA_SFM_PrsAbs[,6:44], corr = "cailliez", scale.RaoQ = F)$RaoQ, replicate(999, Rao.null.indswap(CA_SFM_traits[,5:18], CA_SFM_PrsAbs[,6:44])))%>%
+  rename(Rao_obs = 6)
+
+#MX Marina Costa Baja
+MX.MCB.indswap.Rao<-cbind(MX_MCB_PrsAbs_SS[,1:5], dbFD(MX_MCB_traits_SS[, 5:18][colnames(MX_MCB_PrsAbs_SS[, 6:50]),], MX_MCB_PrsAbs_SS[,6:50], corr = "cailliez", scale.RaoQ = F)$RaoQ, replicate(999, Rao.null.indswap(MX_MCB_traits_SS[,5:18], MX_MCB_PrsAbs_SS[,6:50])))%>%
+  rename(Rao_obs = 6)
+
+#MX Marina La Paz
+MX.MLP.indswap.Rao<-cbind(MX_MLP_PrsAbs_SS[,1:5], dbFD(MX_MLP_traits_SS[, 5:18][colnames(MX_MLP_PrsAbs_SS[, 6:52]),], MX_MLP_PrsAbs_SS[,6:52], corr = "cailliez", scale.RaoQ = F)$RaoQ, replicate(999, Rao.null.indswap(MX_MLP_traits_SS[,5:18], MX_MLP_PrsAbs_SS[,6:52])))%>%
+  rename(Rao_obs = 6)
+
+#MX Marina Palmira
+MX.MP.indswap.Rao<-cbind(MX_MP_PrsAbs_SS[,1:5], dbFD(MX_MP_traits_SS[, 5:18][colnames(MX_MP_PrsAbs_SS[, 6:48]),], MX_MP_PrsAbs_SS[,6:48], corr = "cailliez", scale.RaoQ = F)$RaoQ, replicate(999, Rao.null.indswap(MX_MP_traits_SS[,5:18], MX_MP_PrsAbs_SS[,6:48])))%>%
+  rename(Rao_obs = 6)
+
+#PA Flamenco
+PA.FM.indswap.Rao<-cbind(PA_FM_PrsAbs[,1:5], dbFD(PA_FM_traits[, 5:18][colnames(PA_FM_PrsAbs[, 6:42]),], PA_FM_PrsAbs[,6:42], corr = "cailliez", scale.RaoQ = F)$RaoQ, replicate(999, Rao.null.indswap(PA_FM_traits[,5:18], PA_FM_PrsAbs[,6:42])))%>%
+  rename(Rao_obs = 6)
+
+#PA La Playita
+PA.LP.indswap.Rao<-cbind(PA_LP_PrsAbs[,1:5], dbFD(PA_LP_traits[, 4:17][colnames(PA_LP_PrsAbs[, 6:39]),], PA_LP_PrsAbs[,6:39], corr = "cailliez", scale.RaoQ = F)$RaoQ, replicate(999, Rao.null.indswap(PA_LP_traits[,4:17], PA_LP_PrsAbs[,6:39])))%>%
+  rename(Rao_obs = 6)
+
+#PA Naos
+PA.NI.indswap.Rao<-cbind(PA_NI_PrsAbs[,1:5], dbFD(PA_NI_traits[, 4:17][colnames(PA_NI_PrsAbs[, 6:47]),], PA_NI_PrsAbs[,6:47], corr = "cailliez", scale.RaoQ = F)$RaoQ, replicate(999, Rao.null.indswap(PA_NI_traits[,4:17], PA_NI_PrsAbs[,6:47])))%>%
+  rename(Rao_obs = 6)
+
+#Bind all together/calculate SES -> AK
+
+Rao.AK.indswap <- rbind(AK.BH.indswap.Rao, AK.KC.indswap.Rao, AK.RC.indswap.Rao)
+
+Rao.SES.AK.indswap <- cbind(Rao.AK.indswap[,1:6], (Rao.AK.indswap[,6] - apply(Rao.AK.indswap[, 7:1005], MARGIN = 1, mean)) / apply(Rao.AK.indswap[, 7:1005], MARGIN = 1, sd))%>%
+  rename(SES_Rao = 7)
+
+Rao.SES.AK.wide.indswap <- Rao.SES.AK.indswap %>%
+  pivot_wider(names_from = c(Duration, Treatment), values_from = SES_Rao)
+
+
+#Bind all together/calculate SES -> CA
+
+Rao.CA.indswap <- rbind(CA.LL.indswap.Rao, CA.RM.indswap.Rao, CA.SFM.indswap.Rao)
+
+Rao.SES.CA.indswap <- cbind(Rao.CA.indswap[,1:6], (Rao.CA.indswap[,6] - apply(Rao.CA.indswap[, 7:1005], MARGIN = 1, mean)) / apply(Rao.CA.indswap[, 7:1005], MARGIN = 1, sd))%>%
+  rename(SES_Rao = 7)
+
+Rao.SES.CA.indswap$Duration_f <-  factor(Rao.SES.CA.indswap$Duration, levels=c('3_month','12_month'))
+
+Rao.SES.CA.wide.indswap <- Rao.SES.CA.indswap %>%
+  pivot_wider(names_from = c(Duration, Treatment), values_from = SES_Rao)
+
+#Bind all together/calculate SES -> MX
+
+Rao.MX.indswap <- rbind(MX.MCB.indswap.Rao, MX.MLP.indswap.Rao, MX.MP.indswap.Rao)
+
+Rao.SES.MX.indswap <- cbind(Rao.MX.indswap[,1:6], (Rao.MX.indswap[,6] - apply(Rao.MX.indswap[, 7:1005], MARGIN = 1, mean)) / apply(Rao.MX.indswap[, 7:1005], MARGIN = 1, sd))%>%
+  rename(SES_Rao = 7)
+
+Rao.SES.MX.indswap$Duration_f <-  factor(Rao.SES.MX.indswap$Duration, levels=c('3_month','12_month'))
+
+Rao.SES.MX.wide.indswap <- Rao.SES.MX.indswap %>%
+  pivot_wider(names_from = c(Duration, Treatment), values_from = SES_Rao)
+
+#Bind all together/calculate SES -> PA
+
+Rao.PA.indswap <- rbind(PA.FM.indswap.Rao, PA.LP.indswap.Rao, PA.NI.indswap.Rao)
+
+Rao.SES.PA.indswap <- cbind(Rao.PA.indswap[,1:6], (Rao.PA.indswap[,6] - apply(Rao.PA.indswap[, 7:1005], MARGIN = 1, mean)) / apply(Rao.PA.indswap[, 7:1005], MARGIN = 1, sd))%>%
+  rename(SES_Rao = 7)
+
+Rao.SES.PA.indswap$Duration_f <-  factor(Rao.SES.PA.indswap$Duration, levels=c('3_month','12_month'))
+
+Rao.SES.PA.wide.indswap <- Rao.SES.PA.indswap %>%
+  pivot_wider(names_from = c(Duration, Treatment), values_from = SES_Rao)
+
+##MEXICO 3 MONTH ONLY
+
+#MX Marina Costa Baja
+MX.MCB.indswap.Rao.3mo<-cbind(MX_MCB_PrsAbs_SS_3mo[,1:5], dbFD(MX_MCB_traits_SS_3mo[, 5:18][colnames(MX_MCB_PrsAbs_SS_3mo[, 6:49]),], MX_MCB_PrsAbs_SS_3mo[,6:49], corr = "cailliez", scale.RaoQ = F)$RaoQ, replicate(999, Rao.null.indswap(MX_MCB_traits_SS_3mo[,5:18], MX_MCB_PrsAbs_SS_3mo[,6:49])))%>%
+  rename(Rao_obs = 6)
+
+#MX Marina La Paz
+MX.MLP.indswap.Rao.3mo<-cbind(MX_MLP_PrsAbs_SS_3mo[,1:5], dbFD(MX_MLP_traits_SS_3mo[, 5:18][colnames(MX_MLP_PrsAbs_SS_3mo[, 6:46]),], MX_MLP_PrsAbs_SS_3mo[,6:46], corr = "cailliez", scale.RaoQ = F)$RaoQ, replicate(999, Rao.null.indswap(MX_MLP_traits_SS_3mo[,5:18], MX_MLP_PrsAbs_SS_3mo[,6:46])))%>%
+  rename(Rao_obs = 6)
+
+#MX Marina Palmira
+MX.MP.indswap.Rao.3mo<-cbind(MX_MP_PrsAbs_SS_3mo[,1:5], dbFD(MX_MP_traits_SS_3mo[, 5:18][colnames(MX_MP_PrsAbs_SS_3mo[, 6:47]),], MX_MP_PrsAbs_SS_3mo[,6:47], corr = "cailliez", scale.RaoQ = F)$RaoQ, replicate(999, Rao.null.indswap(MX_MP_traits_SS_3mo[,5:18], MX_MP_PrsAbs_SS_3mo[,6:47])))%>%
+  rename(Rao_obs = 6)
+
+#SES RAO MX 3 Month
+Rao.MX.indswap.3mo <- rbind(MX.MCB.indswap.Rao.3mo, MX.MLP.indswap.Rao.3mo, MX.MP.indswap.Rao.3mo)
+
+Rao.SES.MX.indswap.3mo <- cbind(Rao.MX.indswap.3mo[,1:6], (Rao.MX.indswap.3mo[,6] - apply(Rao.MX.indswap.3mo[, 7:1005], MARGIN = 1, mean)) / apply(Rao.MX.indswap.3mo[, 7:1005], MARGIN = 1, sd))%>%
+  rename(SES_Rao = 7)
+
+Rao.SES.MX.wide.indswap.3mo <- Rao.SES.MX.indswap.3mo %>%
+  pivot_wider(names_from = Treatment, values_from = SES_Rao)
+
+Rao.SES.MX.wide.indswap.3mo
+
+#Wilcoxon tests
+Wlcxn.AK <- apply(Rao.SES.AK.wide.indswap[, 5:10], MARGIN = 2,  wilcoxon)
+Wlcxn.CA <- apply(Rao.SES.CA.wide.indswap[, 6:11], MARGIN = 2,  wilcoxon)
+Wlcx.MX <- apply(Rao.SES.MX.wide.indswap[, 6:9], MARGIN = 2,  wilcoxon)
+Wlcx.MX.3mo <- apply(Rao.SES.MX.wide.indswap.3mo[, 6:8], MARGIN = 2,  wilcoxon)
+Wlcx.PA <- apply(Rao.SES.PA.wide.indswap[, 6:11], MARGIN = 2,  wilcoxon)
+
+#Figure 2
+All.SES.Rao <- rbind(Rao.SES.AK.indswap, Rao.SES.CA.indswap, Rao.SES.MX.indswap, Rao.SES.PA.indswap)
+
+All.Rao.plot <-  ggplot(All.SES.Rao, aes(Treatment, SES_Rao))+
+  geom_hline(yintercept=0, color = "gray", size = 1)+
+  geom_boxplot(width = 0.5, outlier.size = 0.08)+
+  ylim(-4, 3)+
+  labs(y = "SES RaoQ")+
+  facet_grid(Region~Duration_f)+
+  #geom_text(x=1, y=1.7, label="*")+
+  #geom_text(x=2, y=1.7, label="*")+
+  #ggtitle("Panama - Null constrained (richness & frequency)")+
+  theme(panel.grid.major = element_blank(), text = element_text(size = 14))
+
+#Appendix 3
+Rao.all.plot <- ggplot(All.SES.Rao[-181:-240,])+
+  geom_boxplot(aes(Duration_f, Rao_obs, fill = Treatment))+
+  scale_fill_manual(labels = c("caged", "open", "partial cage"), values = c(rgb(68, 114, 196, maxColorValue = 255), rgb(252, 25, 8, maxColorValue = 255), rgb(252, 25, 8, maxColorValue = 255)))+
+  theme_classic()+
+  labs(y = "RaoQ observed", fill = "Treatment")+
+  theme(text = element_text(size = 14))+
+  facet_wrap(~Region)
+
+#RaoQ (observed) mixed models
+
+Rao.all.lmer <- lmer(Rao_obs ~ Region*Duration*Treatment + (1|Region:Site) + (1|Region:Site:Duration) + (1|Region:Site:Treatment) + (1|Region:Site:Duration:Treatment) , data = All.SES.Rao[-181:-240,])
+
+isSingular(Rao.all.lmer)
+
+summary(Rao.all.lmer)
+
+attr(model.matrix(Rao.all.lmer), "col.dropped")
+
+res.Rao.all.lmer <- residuals(Rao.all.lmer, level = 0)
+plot(res.Rao.all.lmer)
+hist(res.Rao.all.lmer)
+qqnorm(res.Rao.all.lmer)
+shapiro.test(res.Rao.all.lmer)
+plot(Rao.all.lmer)
+
+##Dropped random interaction causing singular fit - same result 
+
+Rao.all.lmer.2 <- lmer(Rao_obs ~ Region*Duration*Treatment + (1|Region:Site:Duration) + (1|Region:Site) + (1|Region:Site:Duration:Treatment) , data = All.SES.Rao[-181:-240,])
+
+isSingular(Rao.all.lmer.2)
+summary(Rao.all.lmer.2)
+
+anova(Rao.all.lmer.2)
+
+res.Rao.all.lmer.2 <- residuals(Rao.all.lmer.2, level = 0)
+plot(res.Rao.all.lmer.2)
+hist(res.Rao.all.lmer.2)
+qqnorm(res.Rao.all.lmer.2)
+shapiro.test(res.Rao.all.lmer.2)
+plot(Rao.all.lmer.2)
+
+condMeans.all.duration.2 <- emmeans(Rao.all.lmer.2, ~Region*Duration)
+
+contrasts.Rao.lmer.dur.2 <- as_tibble(contrast(condMeans.all.duration.2, list(duration.contrast.all.nmx)))
+
+##Figure 1
+
+condMeans.all.duration.graph.2 <-as_tibble(condMeans.all.duration.2)
+
+condMeans.all.duration.graph.2$Duration_f <-  factor(condMeans.all.duration.graph.2$Duration, levels=c('3_month','12_month'))
+
+condMeans.all.duration.graph.2 <- mutate(condMeans.all.duration.graph.2, plus.SE = emmean + SE, minus.SE = emmean - SE)
+
+estmean.duration.2 <- ggplot(condMeans.all.duration.graph.2, aes(Duration_f, emmean, group = Region))+
+  geom_errorbar(aes(ymin= minus.SE, ymax= plus.SE), width=0.05, color="black")+
+  geom_path( linetype = 3)+
+  geom_point(aes(shape = Region, size = 1.5, color = Region))+
+  scale_fill_brewer(palette = "Set1")+
+  guides(size = FALSE, color = guide_legend(override.aes = list(size=4)))+
+  #scale_colour_manual(values = c(rgb(68, 114, 196, maxColorValue = 255), rgb(252, 25, 8, maxColorValue = 255)))+
+  labs(y = "RaoQ", x = "Assembly time")+
+  theme_classic()+
+  theme(text = element_text(size = 14))
+
+#Open space - LMMs & GLMMs#
+
+##Files upload##
+
+#Upload data 
+
+Panel_list <- read.csv(file.choose())
+Abun_os <- read.csv(file.choose())
+
+#Add zeros to NA and add weight column
+
+all_os_abun <- left_join(Panel_list, Abun_os)%>%
+  mutate_all(~replace(., is.na(.), 0))%>%
+  mutate(weight=50)
+
+# 1. LMM open space abundance  
+os.lmer <- lmer(Abundance ~ Region*Duration*Treatment + (1|Region:Site) + (1|Region:Site:Duration) + (1|Region:Site:Treatment) + (1|Region:Site:Duration:Treatment) , data = all_os_abun[-181:-240,])
+isSingular(os.lmer)
+summary(os.lmer)
+res.os.lmer <- residuals(os.lmer, level = 0)
+plot(res.os.lmer)
+hist(res.os.lmer)
+qqnorm(res.os.lmer)
+shapiro.test(res.os.lmer)
+plot(os.lmer)
+
+# 2. LMM open space abundance: removed singular fit
+os.lmer.1 <- lmer(Abundance ~ Region*Duration*Treatment + (1|Region:Site:Duration) + (1|Region:Site:Treatment) + (1|Region:Site:Duration:Treatment) , data = all_os_abun[-181:-240,])
+isSingular(os.lmer.1)
+summary(os.lmer.1)
+res.os.lmer.1 <- residuals(os.lmer.1, level = 0)
+plot(res.os.lmer.1)
+hist(res.os.lmer.1)
+qqnorm(res.os.lmer.1)
+shapiro.test(res.os.lmer.1)
+plot(os.lmer.1)
+
+#3. LMM arcsine sqroot transformed data
+
+os.lmer.2 <- lmer(asin(sqrt(Abundance)) ~ Region*Duration*Treatment + (1|Region:Site) + (1|Region:Site:Duration) + (1|Region:Site:Treatment) + (1|Region:Site:Duration:Treatment) , data = all_os_abun[-181:-240,])
+isSingular(os.lmer.2)
+summary(os.lmer.2)
+res.os.lmer.2 <- residuals(os.lmer.2, level = 0)
+plot(res.os.lmer.2)
+hist(res.os.lmer.2)
+qqnorm(res.os.lmer.2)
+shapiro.test(res.os.lmer.2)
+plot(os.lmer.2)
+allFit(os.lmer.2,
+       verbose = TRUE,
+       show.meth.tab = FALSE,
+       maxfun = 1e5,
+       parallel = c("no", "multicore", "snow"),
+       ncpus = getOption("allFit.ncpus", 1L), cl = NULL)
+
+#4. GLMM:optimizer bobyqa
+
+os.glmer.2 <- glmer(Abundance ~ Region*Duration*Treatment + (1|Region:Site) + (1|Region:Site:Duration) + (1|Region:Site:Treatment) + (1|Region:Site:Duration:Treatment), family = "binomial", weights=weight, data = all_os_abun[-181:-240,], glmerControl(optimizer = "bobyqa"))
+isSingular(os.glmer.2)
+summary(os.glmer.2)
+res.os.glmer.2 <- residuals(os.glmer.2, level = 0)
+plot(res.os.glmer.2)
+hist(res.os.glmer.2)
+qqnorm(res.os.glmer.2)
+shapiro.test(res.os.glmer.2)
+plot(os.glmer.2)
+
+#5. #GLMM: optimizer bobyqa -> removed singular fit
+
+os.glmer.3 <- glmer(Abundance ~ Region*Duration*Treatment + (1|Region:Site:Duration) + (1|Region:Site:Treatment) + (1|Region:Site:Duration:Treatment), family = "binomial", weights=weight, data = all_os_abun[-181:-240,], glmerControl(optimizer = "bobyqa"))
+isSingular(os.glmer.3)
+summary(os.glmer.3)
+res.os.glmer.3 <- residuals(os.glmer.3, level = 0)
+plot(res.os.glmer.3)
+hist(res.os.glmer.3)
+qqnorm(res.os.glmer.3)
+shapiro.test(res.os.glmer.3)
+plot(os.glmer.3)
+
+#6. binomial GLMM
+os.glmmtmb.bi <- glmmTMB(Abundance ~ Region*Duration*Treatment + (1|Region:Site) + (1|Region:Site:Duration) + (1|Region:Site:Treatment) + (1|Region:Site:Duration:Treatment), family = binomial, weights=weight, data = all_os_abun[-181:-240,])
+summary(os.glmmtmb.bi)
+testDispersion(os.glmmtmb.bi)
+simulationOutput.bi <- simulateResiduals(fittedModel = os.glmmtmb.bi, plot = F)
+residuals(simulationOutput.bi)
+plot(simulationOutput.bi)
+
+#7 beta-binomial GLMM
+os.glmmtmb.bb <- glmmTMB(Abundance ~ Region*Duration*Treatment + (1|Region:Site) + (1|Region:Site:Duration) + (1|Region:Site:Treatment) + (1|Region:Site:Duration:Treatment), family = betabinomial (link = "logit"), weights=weight, data = all_os_abun[-181:-240,])
+summary(os.glmmtmb.bb)
+testDispersion(os.glmmtmb.bb)
+simulationOutput <- simulateResiduals(fittedModel = os.glmmtmb.bb, plot = F)
+residuals(simulationOutput)
+plot(simulationOutput)
+Anova(os.glmmtmb.bb, type = 3)
+#contrats Region*duration
+condMeans.all.duration <- emmeans(os.glmmtmb.bb, ~Region*Duration)
+condMeans.all.duration
+AK.dur <- c(-1, 0, 0, 1, 0, 0)
+CA.dur <- c(0, -1, 0, 0, 1, 0)
+PA.dur <- c(0, 0, -1, 0, 0, 1)
+duration.contrast.all <- cbind(AK.dur, CA.dur, PA.dur)
+contrasts.os.glmmtmb.bb.dur <- as_tibble(contrast(condMeans.all.duration, list(duration.contrast.all)))
+contrasts.os.glmmtmb.bb.dur
+
+##Figure 3
+
+condMeans.all.duration.graph.os <-as_tibble(condMeans.all.duration)
+condMeans.all.duration.graph.os$Duration_f <-  factor(condMeans.all.duration.graph.os$Duration, levels=c('3_month','12_month'))
+condMeans.all.duration.graph.os <- mutate(condMeans.all.duration.graph.os, plus.SE = emmean + SE, minus.SE = emmean - SE)
+
+os.estmean.duration. <- ggplot(condMeans.all.duration.graph.os, aes(Duration_f, emmean, group = Region))+
+  geom_errorbar(aes(ymin= minus.SE, ymax= plus.SE), width=0.05, color="black")+
+  geom_path( linetype = 3)+
+  geom_point(aes(shape = Region, size = 1.5, color = Region))+
+  guides(size = FALSE, color = guide_legend(override.aes = list(size=4)))+
+  scale_colour_manual(values = c(rgb(40,90,169,  maxColorValue = 255), rgb(78,145,205, maxColorValue = 255), rgb(27,159,73, maxColorValue =   255)))+
+  labs(y = "Space available (emmean open space)", x = "Assembly stage")+
+  theme_classic()+
+  theme(text = element_text(size = 14))
+
+#CWM manyglm#
+
+#Upload trait abund all regions (no mex)
+
+CWM.all <- rbind(CWM.AK.std, CWM.CA.std, CWM.PA.std)
+CWM.trim <- select(CWM.all, -c(14, 22, 28))#remove reciprocal traits
+CWM.tabu <- mvabund(CWM.trim[, 6:36])#set up matrix x manyglm
+is.mvabund(CWM.tabu)
+
+#manyglm "family = poisson"
+mod.pois.3.12 <- manyglm(CWM.tabu~CWM.trim$Region*CWM.trim$Duration*CWM.trim$Treatment, family = "poisson", cor.type = "I")
+view(residuals(mod.pois.3.12))
+qqnorm(residuals.manyglm(mod.pois.3.12))
+qqline(residuals.manyglm(mod.pois.3.12))
+plot(mod.pois.3.12)
+
+#manyglm "family = binomial"
+mod.bi.3.12 <- manyglm(CWM.tabu[,1:ncol(CWM.tabu)]/100~CWM.trim$Region*CWM.trim$Duration*CWM.trim$Treatment, family = "binomial", cor.type = "I")#values between 0&1 to fit binomial distribution 
+view(residuals(mod.bi.3.12))
+qqnorm(residuals.manyglm(mod.bi.3.12))
+qqline(residuals.manyglm(mod.pois.3.12))
+plot(mod.bi.3.12)
+plot(mod.bi.3.12, res.type="pit.norm", which=1:3, caption=c("Residuals vs Fitted", "Normal Q-Q", 
+                                                         "Scale-Location"), overlay=TRUE, n.vars=Inf, var.subset=NULL, sub.caption=NULL)
+
+#manyglm "family=neg.bin"
+mod.nb.3.12 <- manyglm(CWM.tabu~CWM.trim$Region*CWM.trim$Duration*CWM.trim$Treatment, family = "negative.binomial", cor.type = "I")
+qqnorm(residuals.manyglm(mod.nb.3.12))
+qqline(residuals.manyglm(mod.nb.3.12))
+plot(mod.nb.3.12)
+plot.manyglm(mod.nb.3.12)
+plot(mod.nb.3.12, res.type="pit.norm", which=1:3, caption=c("Residuals vs Fitted", "Normal Q-Q", 
+                                                         "Scale-Location"), overlay=TRUE, n.vars=Inf, var.subset=NULL, sub.caption=NULL)
+
+### with cor.type shrink###
+mod.nb.3.12.shrink <- manyglm(CWM.tabu~CWM.trim$Region*CWM.trim$Duration*CWM.trim$Treatment, family = "negative.binomial", cor.type = "shrink")
+qqnorm(residuals.manyglm(mod.nb.3.12.shrink))
+qqline(residuals.manyglm(mod.nb.3.12.shrink))
+plot(mod.nb.3.12.shrink)
+
+#anova
+permID.3.12 <- shuffleSet(n=nrow(CWM.tabu.3.12),control = how(block=CWM.3.12mo$Site))
+aov.mod.nb.3.12 <- anova.manyglm(mod.nb.3.12, bootID = permID.3.12, nBoot = 999, p.uni = "adjusted")
+univ.mod.nb.3.12 <- as.matrix(aov.mod.nb.3.12$uni.p)
+univ.mod.nb.3.12.dev <- as.matrix(aov.mod.nb.3.12$uni.test)
+
+#Pairwise region:duration
+aov.mod.nb.3.12.p.regdur <- anova.manyglm(mod.nb.3.12, pairwise.comp = ~CWM.trim$Region*CWM.trim$Duration, bootID = permID.3.12, nBoot = 999, p.uni = "adjusted")
+pair.regdur <- as.matrix(aov.mod.nb.3.12.p.regdur$pairwise.comp.table)
+univ.mod.nb.3.12.dev <- as.matrix(aov.mod.nb.3.12.p.regdur$uni.test)
+univ.mod.nb.3.12.pval <- as.matrix(aov.mod.nb.3.12.p.regdur$uni.p)
+
+#Pairwise region:duration:treatment
+aov.mod.bi.3.12.p.rdt <- anova.manyglm(mod.bi.3.12 , pairwise.comp = ~CWM.trim$Region*CWM.trim$Duration*CWM.trim$Treatment, bootID = permID.3.12, nBoot = 999, p.uni = "adjusted")
+mod.bi.3.12.pair.rdt <- as.matrix(aov.mod.bi.3.12.p.rdt$pairwise.comp.table)
+
+#PCA CWMs region:assembly stage
+CWM.PCA.2 <- PCA(CWM.trim[,c(1,3,6,7,12, 14:16,18:25,27,28,30:35)], quali.sup = c(1,2), scale.unit = TRUE)
+#Screeplot
+fviz_eig(CWM.PCA.2, addlabels = TRUE, ylim = c(0, 50))
+#Dimension description (significantly associated variables)
+CWM.PCA.desc <- dimdesc(CWM.PCA.2, axes = c(1,2, 3), proba = 0.05)
+CWM.PCA.desc$Dim.1
+CWM.PCA.desc$Dim.2
+#Cos^2 results
+CWM.PCA.results <- get_pca_var(CWM.PCA.2)
+CWM.PCA.results$cos2
+#loadings
+CWM.PCA.2.loadings<-sweep(CWM.PCA.2$var$coord,2,sqrt(CWM.PCA.2$eig[1:5,1]),FUN="/")
+#Biplot selecting ind & variables with cos^2>0.5
+PCA.CWM.obs <-fviz_pca_biplot(CWM.PCA.2, geom = "point", 
+                              col.ind = CWM.trim$Region,
+                              palette = c("#295aa9", "#4f91cd", "#1b9f49"), 
+                              mean.point = FALSE, 
+                              repel = TRUE, 
+                              labelsize = 3.5, 
+                              select.ind = list(cos2 = 0.5), 
+                              select.var = list(cos2 = 0.5)) +
+                              xlim(-6, 7)+
+                              ylim(7, -7)
+#Biplot with 95% CI ellipse by assembly stage
+PCA.CWM.ellip <- fviz_pca_ind(CWM.PCA.2, 
+                              geom.ind = "point",
+                              mean.point = FALSE,
+                              habillage = CWM.trim$Duration, 
+                              addEllipses = TRUE,
+                              ellipse.level = 0.95)+
+                              xlim(-6, 7)+
+                              ylim(7, -7)
+
+#PCA Panama
+##3 month
+CWM.PA3mo <- filter(CWM.PA.std, Duration == "Early")
+
+CWM.PCA.PA3mo <- PCA(CWM.PA3mo[,c(5,7,18,21,24,39)], quali.sup = 1,  scale.unit = TRUE)
+#Screeplot
+fviz_eig(CWM.PCA.PA3mo, addlabels = TRUE, ylim = c(0, 50))
+###Loadings
+CWM.PCA.PA3mo.loadings<-as.matrix(sweep(CWM.PCA.PA3mo$var$coord,2,sqrt(CWM.PCA.2$eig[1:5,1]),FUN="/"))
+
+#Dimension description (significantly associated variables)
+CWM.PCA.desc.PA3mo <- dimdesc(CWM.PCA.PA3mo, axes = c(1,2, 3), proba = 0.05)
+CWM.PCA.desc.PA3mo$Dim.1
+CWM.PCA.desc.PA3mo$Dim.2
+
+CWM.PCA.PA3mo.graph <- fviz_pca_biplot(CWM.PCA.PA3mo, geom = "point", 
+                                       col.ind = CWM.PA3mo$Treatment,
+                                       palette = c("#416fbd", "#fa1709", "#fda29d"), 
+                                       mean.point = FALSE, 
+                                       repel = TRUE, 
+                                       addEllipses = FALSE,
+                                       labelsize = 3.5, 
+                                       select.var = list(cos2 = 0.5)) +
+                                       xlim(-4, 4)+
+                                       ylim(4, -4)
+
+#12 mo
+CWM.PA12mo <- filter(CWM.PA.std, Duration == "Late")
+
+CWM.PCA.PA12mo <- PCA(CWM.PA12mo[,c(5,7,18,21,24,39)], quali.sup = 1,  scale.unit = TRUE)
+#Screeplot
+fviz_eig(CWM.PCA.PA12mo, addlabels = TRUE, ylim = c(0, 50))
+
+#Dimension description (significantly associated variables)
+CWM.PCA.desc.PA12mo <- dimdesc(CWM.PCA.PA12mo, axes = c(1,2, 3), proba = 0.05)
+CWM.PCA.desc.PA12mo$Dim.1
+CWM.PCA.desc.PA12mo$Dim.2
+
+CWM.PCA.PA12mo.graph <-fviz_pca_biplot(CWM.PCA.PA12mo, geom = "point", 
+                                       col.ind = CWM.PA12mo$Treatment,
+                                       palette = c("#416fbd", "#fa1709", "#fda29d"), 
+                                       mean.point = FALSE, 
+                                       repel = TRUE, 
+                                       addEllipses = FALSE,
+                                       labelsize = 3.5, 
+                                       select.var = list(cos2 = 0.5)) +
+                                       xlim(-4, 4)+
+                                       ylim(4, -4)
+
